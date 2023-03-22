@@ -1,0 +1,6 @@
+/home/jin/demo/TASK/build/CMakeFiles/buildR2T.dir
+/home/jin/demo/TASK/build/CMakeFiles/IUA.dir
+/home/jin/demo/TASK/build/CMakeFiles/IQA.dir
+/home/jin/demo/TASK/build/CMakeFiles/multiKey.dir
+/home/jin/demo/TASK/build/CMakeFiles/edit_cache.dir
+/home/jin/demo/TASK/build/CMakeFiles/rebuild_cache.dir

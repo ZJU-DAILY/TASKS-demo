@@ -1,0 +1,1 @@
+/usr/bin/c++  -fopenmp CMakeFiles/IUA.dir/IUA.cpp.o CMakeFiles/IUA.dir/util/trie.cc.o CMakeFiles/IUA.dir/util/util.cc.o CMakeFiles/IUA.dir/util/PB.cpp.o CMakeFiles/IUA.dir/util/ioUint.cpp.o CMakeFiles/IUA.dir/util/ioPB.cpp.o CMakeFiles/IUA.dir/util/mtrie.cc.o CMakeFiles/IUA.dir/util/canLabel.cpp.o CMakeFiles/IUA.dir/util/canLabelET.cpp.o -o IUA 
