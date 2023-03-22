@@ -1,0 +1,1 @@
+/usr/bin/c++  -fopenmp CMakeFiles/IQA.dir/IQA.cpp.o CMakeFiles/IQA.dir/util/trie.cc.o CMakeFiles/IQA.dir/util/util.cc.o CMakeFiles/IQA.dir/util/PB.cpp.o CMakeFiles/IQA.dir/util/ioUint.cpp.o CMakeFiles/IQA.dir/util/ioPB.cpp.o CMakeFiles/IQA.dir/util/mtrie.cc.o CMakeFiles/IQA.dir/util/canLabel.cpp.o CMakeFiles/IQA.dir/util/canLabelET.cpp.o -o IQA 
