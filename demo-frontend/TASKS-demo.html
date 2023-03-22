@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Demo</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <!-- <script src="../js/jquery-3.5.1.min.js" ></script> -->
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+    <!-- <script src="https://unpkg.com/axios/dist/axios.min.js"></script> -->
+    <script src="https://cdn.bootcss.com/axios/0.19.0-beta.1/axios.min.js"></script>
+
+    <link rel="stylesheet" href="./css/style.css">
+
+    <script>
+        var map, infobox, directionsManager, tooltip, searchManager, directionWaypointLayer;
+        var pin1, pin2, center_pin;
+        var temp_pins = [];
+        var path_ids = [];
+        var path_dis = [];
+        var pathData;
+        var chars = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z']
+        var selectLabelId = "queryResultsDiv", displayedInfosId = "resInfos";
+        // var resInfos = document.getElementById("resInfos");  // ERROR: uncaught (in promise)
+        var favoritesInfosIds = new Set(), historyInfosIds = new Set();
+        /*
+            这里说明id的更新机制：
+                从flask中返回的id是string形式的point id，然后对于不同results info的id而言，在后面加上'qry'、'fav'、'his'
+                pin.metadata.id、fav_icon对应元素的dataset.id都是`string形式的point id`
+                在favoritesInfosIds中存储的是`string形式的point id`，即将后缀去掉，实现在不同results info之间的统一
+        */
+
+       function loadDirections() {
+            //Create an instance of the directions manager.
+            directionsManager = new Microsoft.Maps.Directions.DirectionsManager(map);
+
+            directionsManager.setRequestOptions({
+                routeMode: Microsoft.Maps.Directions.RouteMode.walking,
+                distanceUnit: Microsoft.Maps.Directions.DistanceUnit.miles,
+            });
+
+            //Specify where to display the route instructions.
+            directionsManager.setRenderOptions({
+                // itineraryContainer: document.getElementById('directionsItinerary'),//'#directionsItinerary',  // directionsItinerary
+                walkingPolylineOptions: {
+                    strokeDashArray: "1 0",
+                    strokeColor:Microsoft.Maps.Color.fromHex('#b5d9f0'),
+                    strokeThickness: 6
+                },
+                firstWaypointPushpinOptions: { visible: true },
+                lastWaypointPushpinOptions: { visible: true },
+                waypointPushpinOptions: { visible: false }
+            });
+
+            Microsoft.Maps.Events.addHandler(directionsManager, 'directionsUpdated', directionsUpdated);
+
+            //Specify the where to display the input panel
+            directionsManager.showInputPanel('directionsPanel');
+        }
+        
+        function GetMap()
+        {
+            map = new Microsoft.Maps.Map('#myMap', {
+                center: new Microsoft.Maps.Location(40.8206252812, -74.1600070631),  // -74092686 40829000    40.7128, -74.0060
+                mapTypeId: Microsoft.Maps.MapTypeId.road,
+                zoom: 8
+            });
+
+            Microsoft.Maps.Events.addHandler(map, 'click', clickMap); 
+
+            //Create an infobox for displaying detailed information.
+            infobox = new Microsoft.Maps.Infobox(map.getCenter(), {
+                visible: false
+            });
+            infobox.setMap(map);
+
+            //Load the directions module.
+            Microsoft.Maps.loadModule('Microsoft.Maps.Directions', loadDirections);
+
+            Microsoft.Maps.loadModule('Microsoft.Maps.Search', function () {
+                searchManager = new Microsoft.Maps.Search.SearchManager(map);
+            });
+
+            // moveCenterTo(new Microsoft.Maps.Location(40.8152471794, -74.1716240907))
+        }
+
+        function moveCenterTo(loc) {
+            map.entities.remove(center_pin);
+            center_pin = new Microsoft.Maps.Pushpin(loc, {
+                icon: "./source/pin_center.svg",
+                // title: place.name,
+            });
+            map.entities.push(center_pin);
+            map.setView({
+                center: loc,
+                zoom:15
+            });
+            closeInfobox();
+            document.getElementById("lngInput").value = String(loc.longitude.toFixed(10))
+            document.getElementById("latInput").value = String(loc.latitude.toFixed(10))
+        }
+
+        function clickMap(e){
+            // if click at pin
+            var loc;
+            if (e.targetType == "pushpin") {
+                loc = e.target.getLocation();
+            }
+            // if click at map
+            else {
+                var point = new Microsoft.Maps.Point(e.pageX, e.pageY);
+                loc = e.target.tryPixelToLocation(point, Microsoft.Maps.PixelReference.page);
+                moveCenterTo(loc)
+            }
+            console.log("click postion location : "+loc.latitude+", "+loc.longitude);
+            // console.log("location: ", center_pin.getLocation())
+        }
+
+        function directionsUpdated(e) {
+            // console.log("directionsUpdated  path_ids", path_ids)
+            console.log("directionsUpdated pathData", pathData)
+            path_dis = [0]
+            directionWaypointLayer = new Microsoft.Maps.Layer();
+
+            if (e.route && e.route.length > 0) {
+                var wps = directionsManager.getAllWaypoints()
+                var route = e.route[0];
+                // console.log("two length", wps.length, route.routeLegs.length)
+                var waypointCnt = 1;
+                var step;
+                var cnt = 0.0;
+                var adds = [""];
+                for (var i=0; i<route.routeLegs.length; i+=1) {
+                    adds.push(wps[waypointCnt].getAddress())
+                }
+                for (var i = 0; i < route.routeLegs.length; i++) {
+                    var items = route.routeLegs[i].itineraryItems
+                    // console.log("i", i)
+                    for(var j=0; j<items.length; j+=1) {
+                        // console.log('j', j, items[j].distance)
+                        cnt += parseFloat(items[j].distance)
+                    }
+                    // console.log(cnt)
+                    path_dis.push(cnt.toFixed(3))
+
+                    if(i === route.routeLegs.length-1)
+                        break
+                    step = route.routeLegs[i].endWaypointLocation
+                    // console.log("two location", wps[i].getLocation(), step)
+                    pin = new Microsoft.Maps.Pushpin(step, {
+                        icon: './source/icon_letter/fill/'+chars[waypointCnt]+'_fill.svg',
+                        title: adds[waypointCnt],
+                        anchor: new Microsoft.Maps.Point(15, 15),
+                    });
+                    // console.log("wps address", wps[waypointCnt].getAddress())
+
+                    //Store the instruction information in the metadata.
+                    pin.metadata = {
+                        id: path_ids[i],
+                        name: wps[waypointCnt].getAddress(),
+                        longitude: step.longitude,
+                        latitude: step.latitude,
+                        distance: cnt.toFixed(1),
+                    };
+                    Microsoft.Maps.Events.addHandler(pin, 'click', pathPushpinClicked);
+                    waypointCnt++;
+                    directionWaypointLayer.add(pin)
+                }
+                // console.log("directionWaypointLayer", directionWaypointLayer)
+                map.layers.insert(directionWaypointLayer);
+            }
+
+            console.log("path_dis", path_dis)
+
+            var pathInfos = document.getElementById("pathInfos");
+            pidSet = new Set()
+            path_ids = []
+            var idx = 0
+            // console.log("path.length", path.length)
+            for(var i=0; i<pathData.length; ++i) {
+                pid = pathData[i].id
+                if(pidSet.has(pid)){
+                    continue
+                } else{
+                    pidSet.add(pid)
+                    path_ids.push(pid)
+                }
+                // console.log("path[i]: ", i, path[i])
+                a = document.createElement('div');
+                setPathDivStyle(a, pathData[i], 'path', idx, path_dis[idx]);
+                pathInfos.appendChild(a);
+                idx += 1
+                var separate = document.createElement('div')
+                separate.style.position='relative';
+                separate.style.width='100%';
+                separate.style.height='3px';
+                separate.style.backgroundColor = "#F5F5F5";
+                separate.style.visibility = 'hidden';
+                separate.style.borderBottom = "1px solid black"
+                pathInfos.appendChild(separate)
+                // var waypoint = new Microsoft.Maps.Directions.Waypoint({
+                //     location: new Microsoft.Maps.Location(path[i].longitude, path[i].latitude)
+                // });
+                // directionsManager.addWaypoint(waypoint)
+            }
+            clickLabel(document.getElementById("pathDiv"))
+        }
+
+        // TODO: 合并，但是pin1和pin2删除的时候如果用pinObj指向的话会删不掉
+        function clickSourceRes(obj, view='undefined') {  // obj
+            console.log("---------source------------")
+            console.log(obj.id, obj.dataset)
+            map.entities.remove(pin1);
+            clearPins();
+            // add new pin
+            pin1 = new Microsoft.Maps.Pushpin(new Microsoft.Maps.Location(obj.dataset.longitude, obj.dataset.latitude), {
+                icon: './source/spin.svg',
+                title: obj.dataset.name,
+                anchor: new Microsoft.Maps.Point(24, 60),
+            });
+            pin1.metadata = {
+                id: obj.dataset.pid,
+                // title: obj.dataset.info,
+                name: obj.dataset.name,
+                // description: 'Discription for pin',
+                longitude: obj.dataset.longitude,
+                latitude: obj.dataset.latitude
+            };
+
+            //Add a mouse events to the pushpin.
+            Microsoft.Maps.Events.addHandler(pin1, 'click', pushpinClicked);
+            // Microsoft.Maps.Events.addHandler(pin1, 'mouseover', pushpinHovered);
+            // Microsoft.Maps.Events.addHandler(pin1, 'mouseout', closeInfobox);
+            map.entities.push(pin1);
+            closeInfobox();
+            if(view === 'undefined') {
+                map.setView({
+                    center: Microsoft.Maps.LocationRect.fromLocations(pin1.getLocation()).center,
+                    zoom:15
+                });
+            }
+            
+            if(!historyInfosIds.has(pin1.metadata.id)) {
+                historyInfosIds.add(pin1.metadata.id);
+                var hisInfos = document.getElementById("hisInfos");
+                var resDiv = document.createElement('div');
+                setDivStyle(resDiv, pin1.metadata, 'his');
+                // resDiv.addEventListener("click",function(e) {
+                //     clickSourceRes(this);
+                // });
+                hisInfos.appendChild(resDiv);
+                var separate = document.createElement('div')
+                separate.style.position='relative';
+                separate.style.width='100%';
+                separate.style.height='6px';
+                separate.style.backgroundColor = "#F5F5F5";
+                separate.style.visibility = 'hidden';
+                separate.style.borderBottom = "1px solid black"
+                hisInfos.appendChild(separate)
+            }
+
+            // console.log("map.entities  ", map.entities);
+        }
+
+        function clickDestinationRes(obj, view='undefined') {
+            map.entities.remove(pin2);
+            clearPins();
+            // add new pin
+            pin2 = new Microsoft.Maps.Pushpin(new Microsoft.Maps.Location(obj.dataset.longitude, obj.dataset.latitude), {
+                icon: './source/dpin.svg',
+                title: obj.dataset.name,
+                anchor: new Microsoft.Maps.Point(24, 60),
+            });
+            pin2.metadata = {
+                id: obj.dataset.pid,
+                // title: obj.dataset.info,
+                name: obj.dataset.name,
+                // description: 'Discription for pin',
+                longitude: obj.dataset.longitude,
+                latitude: obj.dataset.latitude
+            };
+
+            //Add a mouse events to the pushpin.
+            Microsoft.Maps.Events.addHandler(pin2, 'click', pushpinClicked);
+            // Microsoft.Maps.Events.addHandler(pin2, 'mouseover', pushpinHovered);
+            // Microsoft.Maps.Events.addHandler(pin2, 'mouseout', closeInfobox);
+            map.entities.push(pin2);
+
+            closeInfobox();
+            if(view === 'undefined') {
+                map.setView({
+                    center: Microsoft.Maps.LocationRect.fromLocations(pin2.getLocation()).center,
+                    zoom:15
+                });
+            }
+            
+            if(!historyInfosIds.has(pin2.metadata.id)) {
+                historyInfosIds.add(pin2.metadata.id);
+                var hisInfos = document.getElementById("hisInfos");
+                var resDiv = document.createElement('div');
+                setDivStyle(resDiv, pin2.metadata, 'his');
+                resDiv.addEventListener("click",function(e) {
+                    clickDestinationRes(this);
+                });
+                hisInfos.appendChild(resDiv);
+            }
+
+            // console.log("map.entities  ", map.entities);
+        }
+
+        function clearPins() {
+            for(var i=0; i<temp_pins.length; i+=1) {
+                map.entities.remove(temp_pins[i]);
+            }
+            temp_pins = [];
+        }
+
+        function clearDirections() {
+            //Clear directions waypoints and display without clearing it's options.
+            directionsManager.clearDisplay();
+            // map.entities.remove(pin1);
+            // map.entities.remove(pin2);
+
+            var wp = directionsManager.getAllWaypoints();
+            // console.log("clearDirections wp ", wp)
+            if (wp && wp.length > 0) {
+                for (var i = wp.length - 1; i >= 0; i--) {
+                    this.directionsManager.removeWaypoint(wp[i]);
+                }
+            }
+
+            map.layers.remove(directionWaypointLayer);
+
+            routePath = null;
+        }
+        
+        function pathPushpinClicked(e) {
+            var mdata = e.target.metadata;
+            var state;
+            if(favoritesInfosIds.has(mdata.id)) {
+                state = 'fill';
+            } else {
+                state = 'empty';
+            }
+            var desc = ["<p style='position: absolute; top:30px; left:50px; height:20px;'>Distance: ", mdata.distance, "\xa0\xa0Miles</p>"];
+
+            infobox.setOptions({
+                location: e.target.getLocation(),
+                title: mdata.name,
+                description: desc.join(""),
+                visible: true,
+                showPointer: false, 
+                showCloseButton: true,
+            });
+            infobox.setOptions({
+                offset: new Microsoft.Maps.Point(-infobox.getWidth()/2, 20),
+            });
+        }
+
+        function pushpinClicked(e) {
+            var mdata = e.target.metadata;
+            var state;
+            if(favoritesInfosIds.has(mdata.id)) {
+                state = 'fill';
+            } else {
+                state = 'empty';
+            }
+            var desc = ["<img data-id=", mdata.id, " data-name=\'", mdata.name, "\' data-longitude=", mdata.longitude,
+                        " data-latitude=", mdata.latitude, " data-state=", state, " src='./source/favorites_", state, ".svg' \
+                        style='position: absolute; left: 0px; top: 0px;' zIndex='99' \
+                        onclick=clickFavo(this) />"];
+
+            infobox.setOptions({
+                location: e.target.getLocation(),
+                title: '\xa0\xa0\xa0\xa0'+mdata.name,
+                description: desc.join(""),
+                visible: true,
+                showPointer: false, 
+                showCloseButton: true,
+            });
+            infobox.setOptions({
+                offset: new Microsoft.Maps.Point(-infobox.getWidth()/2, 60)
+            });
+        }
+
+        function clickFavo(obj) {
+            var dataset = obj.dataset;
+            console.log("clickFavo dataset", dataset)
+            var favId = dataset.id + 'fav';
+            if(dataset.state === 'fill') {
+                favoritesInfosIds.delete(dataset.id);
+                obj.src = './source/favorites_empty.svg';
+                dataset.state = 'empty';
+                document.getElementById(favId+'Res').remove()
+                document.getElementById(favId+'Sep').remove()
+            } else {
+                favoritesInfosIds.add(dataset.id);
+                obj.src = './source/favorites_fill.svg'
+                dataset.state = 'fill';
+
+                var favInfos = document.getElementById("favInfos");
+                var resDiv = document.createElement('div');
+                setDivStyle(resDiv, dataset, 'fav');
+                resDiv.id = favId+'Res'
+                // resDiv.addEventListener("click",function(e) {
+                //     if(placeType==='source') {
+                //         clickSourceRes(this);
+                //     }
+                // });
+                favInfos.appendChild(resDiv);
+                var separate = document.createElement('div')
+                separate.id = favId+'Sep'
+                separate.style.position='relative';
+                separate.style.width='100%';
+                separate.style.height='6px';
+                separate.style.backgroundColor = "#F5F5F5";
+                separate.style.visibility = 'hidden';
+                separate.style.borderBottom = "1px solid black"
+                favInfos.appendChild(separate)
+            }
+        }
+
+        // function pushpinHovered(e) {
+        //     var t = e.target;
+        //     var desc = ['<img data-state="empty" src="./source/favorites_empty.svg" \
+        //                 style="position: absolute; left: 0px; top: 0px;" zIndex="99" \
+        //                 onclick=clickFavo(this) />'];
+
+        //     infobox.setOptions({
+        //         id: t.id,
+        //         location: t.getLocation(),
+        //         title: '\xa0\xa0\xa0\xa0'+t.metadata.name,
+        //         description: desc.join(""),
+        //         visible: true,
+        //         showPointer: false, 
+        //         showCloseButton: false,
+        //     });
+        //     infobox.setOptions({
+        //         offset: new Microsoft.Maps.Point(-infobox.getWidth()/2, 40),
+        //     });
+        // }
+
+        function closeInfobox() {
+            //Close the infobox and clear its content.
+            infobox.setOptions({
+                visible: false
+            })
+        }
+
+        async function getRelatedPlaces(keyword) {
+            // send data to python-flask and receive data from there
+            var center = center_pin.getLocation(); // map.getBounds().center;
+            var resPlaces = await new Promise((resolve) =>{
+                var places = axios.post('http://localhost:5000/queryPoints',{
+                "name":keyword,
+                "longitude":center.longitude,
+                "latitude":center.latitude,
+                "k":document.getElementById("resNumInput").value, 
+                "tau":document.getElementById("tauInput").value,
+                "alpha":document.getElementById("alphaInput").value})
+                .then(response=>{
+                    return resolve(response)
+                })
+                // .catch(err=>{
+                //     console.log('error : ' + err);
+                // })
+                return places
+            }) 
+            console.log("resPlaces", resPlaces)
+            return resPlaces
+        }
+
+        function setCenter(obj) {
+            moveCenterTo(new Microsoft.Maps.Location(obj.dataset.longitude, obj.dataset.latitude))
+        }
+
+        async function getCenterPlace(longitude, latitude) {
+            var resPlace = await new Promise((resolve) =>{
+                var place = axios.post('http://localhost:5000/locToPlace',
+                {"longitude": longitude, "latitude": latitude})
+                .then(response=>{
+                    // console.log("response.data", response.data);// 返回的数据
+                    // alert(res.data);
+                    return resolve(response)
+                })
+                .catch(err=>{
+                    console.log('error : ' + err)
+                })
+                return place
+            }) 
+            // console.log("resPlace", resPlace)
+            return resPlace
+        }
+
+        function gotoFromCenter(obj) {
+            clearDirections()
+
+            center_loc = center_pin.getLocation()
+            centerPlace = getCenterPlace(center_loc.longitude, center_loc.latitude)
+            console.log("centerPlace: ", centerPlace)
+            centerPlace.then(res => {  // 为了获取resData中的数据
+                sourcePlace = res.data.place
+                console.log("sourcePlace ", sourcePlace);
+
+                clearPins();
+                map.entities.remove(pin1);
+                map.entities.remove(pin2);
+                // add new pin
+                pin1 = new Microsoft.Maps.Pushpin(new Microsoft.Maps.Location(sourcePlace.longitude, sourcePlace.latitude), {
+                    icon: './source/spin.svg',
+                    title: obj.dataset.name,
+                    anchor: new Microsoft.Maps.Point(17, 45),
+                });
+                pin1.metadata = {
+                    id: sourcePlace.id,
+                    // title: obj.dataset.info,
+                    name: sourcePlace.name,
+                    // description: 'Discription for pin',
+                    longitude: sourcePlace.longitude,
+                    latitude: sourcePlace.latitude
+                };
+                Microsoft.Maps.Events.addHandler(pin1, 'click', pushpinClicked);
+
+                pin2 = new Microsoft.Maps.Pushpin(new Microsoft.Maps.Location(obj.dataset.longitude, obj.dataset.latitude), {
+                    icon: './source/dpin.svg',
+                    title: obj.dataset.name,
+                    anchor: new Microsoft.Maps.Point(17, 45),
+                });
+                pin2.metadata = {
+                    id: obj.dataset.pid,
+                    // title: obj.dataset.info,
+                    name: obj.dataset.name,
+                    // description: 'Discription for pin',
+                    longitude: obj.dataset.longitude,
+                    latitude: obj.dataset.latitude
+                };
+                Microsoft.Maps.Events.addHandler(pin2, 'click', pushpinClicked);
+
+                map.entities.push(pin1);
+                map.entities.push(pin2);
+
+                navigate()
+            })
+        }
+
+        function hisAdd(obj) {
+            console.log("hisAdd this", obj)
+            console.log("hisAdd id", obj.dataset.pid)
+            if(!historyInfosIds.has(obj.dataset.pid)) {
+                historyInfosIds.add(obj.dataset.pid);
+                var hisInfos = document.getElementById("hisInfos");
+                var resDiv = document.createElement('div');
+                setDivStyle(resDiv, obj.dataset, 'his');
+                // resDiv.addEventListener("click",function(e) {
+                //     clickSourceRes(this);
+                //     // console.log("click history", this)
+                // });
+                hisInfos.appendChild(resDiv);
+                var separate = document.createElement('div')
+                separate.style.position='relative';
+                separate.style.width='100%';
+                separate.style.height='6px';
+                separate.style.backgroundColor = "#F5F5F5";
+                separate.style.visibility = 'hidden';
+                separate.style.borderBottom = "1px solid black"
+                hisInfos.appendChild(separate)
+            }
+        }
+
+        function setDivStyle(resDiv, place, type) {
+            // type: 'qry' / 'fav' / 'his'
+            // id: place.id+type
+            // var pid = parseInt(place.id).toString();
+            var left = document.createElement('div')
+            var image = document.createElement('img');
+            image.src = "./source/icon-qry.svg";
+            image.style.position = "absolute"
+            image.style.top = "10px"
+            left.appendChild(image);
+            left.style.position='absolute';
+            left.style.width='8%';
+            left.style.height='100%';
+            // left.style.backgroundColor = "red"
+
+            resDiv.appendChild(left);
+
+            var mid = document.createElement('div');
+            // a.style.visibility = "visible";
+            var separate = document.createElement('div')
+            separate.style.position='relative';  //relative
+            separate.style.top='0';
+            separate.style.width='100%';
+            separate.style.height='5px';
+            separate.style.backgroundColor = "#F5F5F5";
+            separate.style.visibility = 'hidden';
+            mid.appendChild(separate)
+
+            mid.id = place.id + type;
+            // console.log("setDivStyle: ", a.id, place.id)
+            var spanName = document.createElement('span');
+            spanName.style.fontWeight = 900;
+            spanName.appendChild(document.createTextNode(place.name));
+            spanName.style.display = "inline-block" // flow-root
+            // spanName.style.backgroundColor = "red"
+            mid.appendChild(spanName);
+            var br1 = document.createElement("br");
+            mid.appendChild(br1);
+            var spanDis = document.createElement('span');
+            var placeLoc = new Microsoft.Maps.Location(place.longitude, place.latitude);
+            spanDis.appendChild(document.createTextNode(
+                'Distance: '+
+                Microsoft.Maps.SpatialMath.getDistanceTo(
+                    center_pin.getLocation(), 
+                    placeLoc, 
+                    Microsoft.Maps.SpatialMath.DistanceUnits.Miles).toFixed(3)
+                 + "\xa0Miles")
+            );
+            spanDis.style.position = 'absolute';
+            spanDis.style.left = '0px';
+            mid.appendChild(spanDis);
+            br1 = document.createElement("br");
+            mid.appendChild(br1);
+            
+            spanDis = document.createElement('span');
+            spanDis.appendChild(document.createTextNode(
+                'Score: '+ place.score
+            ));
+            spanDis.style.position = 'absolute';
+            spanDis.style.left = '0px';
+            mid.appendChild(spanDis);
+            br1 = document.createElement("br");
+            mid.appendChild(br1);
+
+            var searchRequest = {
+                location: placeLoc,
+                callback: function (r) {
+                    var details = document.createElement('div');
+                    details.appendChild(document.createTextNode(r.name));
+                    details.style.position = 'relative';
+                    details.style.left = '0px';
+                    details.style.fontStyle = 'italic';
+                    mid.appendChild(details);
+                },
+                errorCallback: function (e) {
+                    //If there is an error, alert the user about it.
+                    console.log("Unable to reverse geocode location.");
+                }
+            };
+            searchManager.reverseGeocode(searchRequest);
+
+            // ERROR : a.style.cssText = "width=100px;height=10px;position=absolute;left=23px;backgroundColor=white;zIndex=999;top=" + (30*count) + 'px';
+            
+            mid.dataset.pid = place.id;
+            mid.dataset.longitude = place.longitude;
+            mid.dataset.latitude = place.latitude;
+            mid.dataset.name = place.name;
+            mid.style.position='absolute';
+            mid.style.top='0'
+            mid.style.left='9%';
+            mid.style.width='80%';//'275px';
+            mid.style.height='100%';//'103px';
+            // mid.style.backgroundColor = "green"
+            
+            mid.addEventListener("click",function(e) {
+                console.log("click ", this);
+                if(placeType==='source') {
+                    clickSourceRes(this);
+                    // console.log("click source", this)
+                }
+                else {
+                    clickDestinationRes(this);
+                }
+            });
+
+            resDiv.appendChild(mid);
+
+            var right = document.createElement('div');
+
+            var imgSetCenter = document.createElement('img');
+            imgSetCenter.src = "./source/pin_center_div.svg";
+            imgSetCenter.dataset.longitude = place.longitude;
+            imgSetCenter.dataset.latitude = place.latitude;
+            imgSetCenter.addEventListener('click', function(){
+                setCenter(this);
+            });
+            // imgSetCenter.onclick = "setCenter(this)";
+            right.appendChild(imgSetCenter);
+
+            var imgGoto  = document.createElement('img');
+            imgGoto.src = "./source/goto.svg";
+            imgGoto.dataset.id = place.id;
+            imgGoto.dataset.pid = place.id;
+            imgGoto.dataset.longitude = place.longitude;
+            imgGoto.dataset.latitude = place.latitude;
+            imgGoto.dataset.name = place.name;
+            imgGoto.addEventListener('click', function() {
+                gotoFromCenter(this);
+                hisAdd(this)
+            })
+            right.appendChild(imgGoto);
+
+            right.style.position="absolute";
+            right.style.left="90%";
+            right.style.width="10%";
+            right.style.top="5%";
+            // right.style.backgroundColor = "blue"
+
+            resDiv.appendChild(right);
+            // resDiv.dataset.pid = place.id;
+            // resDiv.dataset.longitude = place.longitude;
+            // resDiv.dataset.latitude = place.latitude;
+            // resDiv.dataset.name = place.name;
+            resDiv.style.position='relative';
+            resDiv.style.width='100%';//'275px';
+            resDiv.style.height='18%';//'103px';
+            resDiv.style.backgroundColor = "#F5F5F5"
+            resDiv.style.zIndex = '999';
+            // a.style.border = '0.5px solid gray';
+            // a.style.opacity = '0.6';
+            resDiv.style.visibility = 'hidden';
+            // resDiv.style.borderBottom = "1px solid black"
+        }
+
+        function setPathDivStyle(a, place, type, idx, dis) {  // , dis
+            // type: 'qry' / 'fav' / 'his'
+            // id: place.id+type
+            // var pid = parseInt(place.id).toString();
+            a.id = place.id + type;
+
+            var left = document.createElement('div')
+            var image = document.createElement('img');
+            image.src = "./source/icon_letter/empty/" +chars[idx]+ "_empty.svg";
+            left.appendChild(image);
+            left.style.position='absolute';
+            left.style.width='8%';
+            left.style.height='100%';
+            // left.style.backgroundColor = "red"
+            a.appendChild(left);
+
+            // console.log("setDivStyle: ", a.id, place.id)
+            var placeLoc = new Microsoft.Maps.Location(place.longitude, place.latitude);
+            // console.log("setPathDivStyle placeLoc", placeLoc)
+
+            var searchRequest = {
+                location: placeLoc,
+                callback: function (r) {
+                    // console.log("r: ", r)
+                    var right = document.createElement('div')
+
+                    var separate = document.createElement('div')
+                    separate.style.position='absolute';
+                    separate.style.width='100%';
+                    separate.style.height='2%';
+                    separate.style.backgroundColor = "#F5F5F5";
+                    separate.style.visibility = 'hidden';
+                    right.appendChild(separate)
+
+                    var spanName = document.createElement('span');
+                    spanName.style.fontWeight = 900;
+                    if(place.name != "") {
+                        spanName.appendChild(document.createTextNode(place.name));
+                    } else {
+                        spanName.appendChild(document.createTextNode(r.address.addressLine));
+                    }
+                    right.appendChild(spanName);
+                    var br = document.createElement("br");
+                    right.appendChild(br);
+                    var spanDis = document.createElement('span');
+                    // spanName.style.fontWeight = 300;
+                    spanDis.appendChild(document.createTextNode(
+                        'Distance: '+
+                        dis
+                        // Microsoft.Maps.SpatialMath.getDistanceTo(
+                        //     center_pin.getLocation(), 
+                        //     new Microsoft.Maps.Location(place.longitude, place.latitude), 
+                        //     Microsoft.Maps.SpatialMath.DistanceUnits.Miles).toFixed(1)
+                        + "\xa0\xa0\xa0Miles")
+                    );
+                    // spanDis.style.position = 'absolute';
+                    // spanDis.style.left = '30px';
+                    right.appendChild(spanDis);
+
+                    br1 = document.createElement("br");
+                    right.appendChild(br1);
+
+                    var details = document.createElement('div');
+                    details.appendChild(document.createTextNode(r.name));
+                    details.style.position = 'absolute';
+                    details.style.left = '0px';
+                    details.style.fontStyle = 'italic';
+                    right.appendChild(details);
+                    // console.log(r)
+
+                    right.style.position="absolute";
+                    right.style.left="10%";
+                    right.style.width="90%";
+                    right.style.top="0";
+                    // right.style.backgroundColor = "blue"
+
+                    a.appendChild(right);
+                },
+                errorCallback: function (e) {
+                    //If there is an error, alert the user about it.
+                    console.log("Unable to reverse geocode location.");
+                }
+            };
+            searchManager.reverseGeocode(searchRequest);
+
+            // ERROR : a.style.cssText = "width=100px;height=10px;position=absolute;left=23px;backgroundColor=white;zIndex=999;top=" + (30*count) + 'px';
+            a.dataset.pid = place.id;
+            a.dataset.longitude = place.longitude;
+            a.dataset.latitude = place.latitude;
+            a.dataset.name = place.name;
+            a.style.position='relative';
+            a.style.width='100%';//'275px';
+            a.style.height='18%';//'103px';
+            a.style.zIndex = '999';
+            // a.style.border = '0.5px solid gray';
+            // a.style.opacity = '0.6';
+            a.style.visibility = 'hidden';
+            a.style.backgroundColor = "#F5F5F5"
+        }
+
+        function showSearchResults(placeType, from=0) {
+            clearPins();
+            clearDirections();
+
+            var placeInfo = document.getElementById(placeType);
+            // if(from === 0) {
+            //     var curLabel = document.getElementById(obj.id)
+            //     changeLabel(curLabel)  // displayedInfosId
+
+            //     var curInfos = document.getElementById(obj.dataset.infoid)
+            //     changeInfos(curInfos)
+            // }
+
+            console.log("placeInfo.value: " + placeInfo.value + "|")
+            // 向后端发出请求，并获得返回的值
+            var resData = getRelatedPlaces(placeInfo.value.trim());
+            var pin_type;
+            if(placeType === 'source') {
+                pin_type = './source/spin.svg';
+                map.entities.remove(pin1);
+            } else {
+                pin_type = './source/dpin.svg';
+                map.entities.remove(pin2);
+            }
+
+            resData.then(res => {  // 为了获取resData中的数据
+                var temp_long = 0, temp_lat = 0;
+                places = res.data.places
+                console.log("places ", places);
+                var resInfos = document.getElementById("resInfos");
+                // delete results before
+                while(resInfos.lastChild) {  //当div下还存在最后的子节点时 循环继续
+                    resInfos.removeChild(resInfos.lastChild);
+                }
+                var resDiv;
+                var locs = [];
+                document.getElementById("qtime").innerText = places[0].time.toFixed(2);
+                for(var i=0; i<places.length; i+=1) {
+                    var place = places[i];
+                    if(place.name==="")
+                        continue;
+                    // console.log("pushpin place: ", place);
+                    // console.log(it + "  " + places[it].id + "  " + places[it].lat + "  " + places[it].long + "  " + places[it].name);
+                    resDiv = document.createElement('div');
+                    setDivStyle(resDiv, place, 'qry');
+                    resDiv.style.visibility = 'visible';
+                    resInfos.appendChild(resDiv);
+                    var separate = document.createElement('div')
+                    separate.style.position='relative';
+                    separate.style.width='99.8%';
+                    separate.style.height='6px';
+                    separate.style.backgroundColor = "#F5F5F5";
+                    separate.style.visibility = 'visible';
+                    separate.style.borderBottom = "1px solid black"
+                    resInfos.appendChild(separate)
+                    
+                    var loc = new Microsoft.Maps.Location(place.longitude, place.latitude);
+                    locs.push(loc);
+
+                    var temp_pin = new Microsoft.Maps.Pushpin(loc, {
+                        icon: pin_type,
+                        title: place.name,
+                        anchor: new Microsoft.Maps.Point(16, 45),
+                    });
+                    temp_pin.metadata = {
+                        id: place.id,
+                        // title: obj.dataset.info,
+                        name: place.name,
+                        // description: 'Discription for pin',
+                        longitude: place.longitude,
+                        latitude: place.latitude
+                    };
+                    Microsoft.Maps.Events.addHandler(temp_pin, 'click', pushpinClicked);
+                    // console.log("temp_pin : ", temp_pin);
+                    temp_long += place.longitude;
+                    temp_lat += place.latitude;
+                    temp_pins.push(temp_pin);
+                    map.entities.push(temp_pin);
+                }
+                // console.log("map.entities: ", map.entities)
+
+                var bestView = Microsoft.Maps.LocationRect.fromLocations(locs);
+                // console.log("best view : ", bestView)
+                // change map center
+                if(places.length != 0) {
+                    // console.log("jump to: ", temp_long/resLength, temp_lat/resLength)
+
+                    map.setView({ bounds: bestView, padding: 30 });
+                    // map.setView({
+                    //     center:new Microsoft.Maps.Location(temp_long/places.length, temp_lat/places.length),
+                    //     zoom:15
+                    // });
+                    closeInfobox();
+                }
+            });
+        }
+
+        function clickNavi() {
+            document.getElementById('destination').style.visibility="visible";
+            document.getElementById('routeIcon').style.visibility="visible";
+        }
+
+        async function getPath(startId, endId) {
+            var resPath = await new Promise((resolve) =>{
+                var path = axios.post('http://localhost:5000/queryPath',
+                {"startId": startId, "endId": endId})
+                .then(response=>{
+                    // console.log("response.data", response.data);// 返回的数据
+                    // alert(res.data);
+                    return resolve(response);
+                })
+                .catch(err=>{
+                    console.log('error : ' + err);
+                })
+                return path;
+            }) 
+            console.log("resPath", resPath);
+            return resPath;
+        }
+
+        function navigate() {
+            //Clear any previously calculated directions.
+            // directionsManager.clearAll();
+            // directionsManager.clearDisplay();
+            clearDirections()
+            clearPins();
+            map.entities.remove(pin1);
+            map.entities.remove(pin2);
+
+            var pathInfos = document.getElementById("pathInfos");
+            while (pathInfos.lastChild) {  //当div下还存在最后的子节点时 循环继续
+                pathInfos.removeChild(pathInfos.lastChild);
+            }
+
+            // console.log(pin1.metadata.id, pin2.metadata.id);
+            resPath = getPath(pin1.metadata.id, pin2.metadata.id);
+            resPath.then(res => {  // 为了获取resData中的数据
+                pathData = res.data.path
+                path = res.data.path
+                // console.log("path res", path);
+                Microsoft.Maps.loadModule('Microsoft.Maps.Directions', loadDirections);
+                document.getElementById("qtime").innerText = path[0].time.toFixed(2);
+                var a, pid
+                var pidSet = new Set()
+                for(var i=0; i<path.length; ++i) {
+                    pid = path[i].id
+                    if(pidSet.has(pid)){
+                        continue
+                    } else{
+                        pidSet.add(pid)
+                        path_ids.push(pid)
+                    }
+                    var waypoint = new Microsoft.Maps.Directions.Waypoint({
+                        location: new Microsoft.Maps.Location(path[i].longitude, path[i].latitude)
+                    });
+                    directionsManager.addWaypoint(waypoint)
+                }
+                directionsManager.calculateDirections()
+
+                // console.log("navigate path_dis", path_dis)
+
+                // ////////the following part is implemented in `directionsUpdated`
+                // // directionsManager = new Microsoft.Maps.Directions.DirectionsManager(map);
+                // var pathInfos = document.getElementById("pathInfos");
+                // pidSet = new Set()
+                // path_ids = []
+                // var idx = 0
+                // // console.log("path.length", path.length)
+                // for(var i=0; i<path.length; ++i) {
+                //     pid = path[i].id
+                //     if(pidSet.has(pid)){
+                //         continue
+                //     } else{
+                //         pidSet.add(pid)
+                //         path_ids.push(pid)
+                //     }
+                //     // console.log("path[i]: ", i, path[i])
+                //     a = document.createElement('div');
+                //     setPathDivStyle(a, path[i], 'path', idx);
+                //     pathInfos.appendChild(a);
+                //     idx += 1
+                //     // var waypoint = new Microsoft.Maps.Directions.Waypoint({
+                //     //     location: new Microsoft.Maps.Location(path[i].longitude, path[i].latitude)
+                //     // });
+                //     // directionsManager.addWaypoint(waypoint)
+                // }
+                // clickLabel(document.getElementById("pathDiv"))
+            })
+        }
+
+        window.onload = function() {
+            var sourceElement = document.getElementById("source")
+            var resElement = document.getElementById('resNumInput')
+            var tauElement = document.getElementById('tauInput')
+            var alphaElement = document.getElementById('alphaInput')
+
+            sourceElement.oninput = function() {
+                if(sourceElement.value != "") {
+                    showSearchResults(placeType="source")
+                }
+                console.log("sourceElement", temp_pins)
+            }
+
+            resElement.oninput = function() {
+                if(sourceElement.value != "") {
+                    showSearchResults(placeType="source")
+                }
+            }
+
+            tauElement.oninput = function() {
+                if(sourceElement.value != "") {
+                    showSearchResults(placeType="source")
+                }
+            }
+
+            alphaElement.oninput = function() {
+                if(sourceElement.value != "") {
+                    showSearchResults(placeType="source")
+                }
+            }
+
+            // var destElement = document.getElementById("destination")
+            // destElement.oninput = function() {
+            //     showSearchResults(placeType="destination", left='335px')
+            // }
+
+            // var center = map.getBounds().center;
+            // center.longitude, center.latitude
+        }
+
+        function alphaInputChange() {
+            var alpha = document.getElementById("alphaInput")
+            console.log("alpha:", alpha.value);
+        }
+
+        function changeLabel(curLabel) {
+            var preLabel = document.getElementById(selectLabelId)
+            preLabel.style.backgroundColor = "#cfcfcf"
+            preLabel.style.borderBottom = "1px solid rgb(138, 141, 141)"
+            
+            curLabel.style.backgroundColor = "#fff"
+            curLabel.style.borderBottom = "0"
+            selectLabelId = curLabel.id
+        }
+
+        function changeInfos(curInfos) {
+            var preInfos = document.getElementById(displayedInfosId)
+            preInfos.style.visibility = "hidden"
+            var preChildren = preInfos.children
+            for(var i=0; i<preChildren.length; i+=1) {
+                preChildren[i].style.visibility="hidden"
+            }
+
+            curInfos.style.visibility = "visible"
+            var curChildren = curInfos.children
+            for(var i=0; i<curChildren.length; i+=1) {
+                curChildren[i].style.visibility="visible"
+            }
+            displayedInfosId = curInfos.id
+        }
+
+        function clickLabel(obj) {  // document.getElementById("queryResultsDiv")
+            if(obj.id != selectLabelId) {
+                var curLabel = document.getElementById(obj.id)
+                changeLabel(curLabel)  // displayedInfosId
+
+                var curInfos = document.getElementById(obj.dataset.infoid)
+                changeInfos(curInfos)
+            }
+            console.log('selectLabelId', selectLabelId)
+            if(obj.id === 'queryResultsDiv') {
+                showSearchResults(placeType="source", from=1)
+            }
+        }
+
+        function setCenterByInput() {
+            var lat = document.getElementById("latInput").value
+            var lng = document.getElementById("lngInput").value
+            if(lat === "" && lng === "") {
+                alert("Please input latitude and longitude!")
+            } else if(lat === "") {
+                alert("Please input latitude!")
+            } else if(lng === "") {
+                alert("Please input longitude!")
+            } else {
+                map.entities.remove(center_pin);
+                var loc = new Microsoft.Maps.Location(lat, lng)
+                center_pin = new Microsoft.Maps.Pushpin(loc, {
+                    icon: "./source/pin_center.svg",
+                    // title: place.name,
+                });
+                map.entities.push(center_pin);
+                map.setView({
+                    center: loc,
+                    zoom:15
+                });
+                closeInfobox();
+            }
+        }
+
+    </script>
+
+</head>
+<body style="height: 100%; width: 100%; font-family: 'Times New Roman', Times, serif;">
+    <div class="leftPartClass">
+        <div class="paraBox">
+            <div style="width: 15%; height: 100%; position: absolute; left: 0; z-index: 2;">
+                <strong style="font-size: 30px; position: absolute; top:15%; left:10%;">Parameters:</strong>
+            </div>
+            <div style="width: 25%; height: 100%; position: absolute; left: 15%; border: 2px dashed black; border-right: 0; z-index: 2;">
+                <p class="tesNumP">Answer Size:</p>
+                <input type="text" id="resNumInput" class="resNumClass" value=""/>
+            </div>
+            <div style="width: 25%; height: 100%; position: absolute; left: 40%; border: 2px dashed black; border-left: 0; border-right: 0; z-index: 2;">
+                <p class="tauP">Error Threshold:</p>
+                <input type="text" id="tauInput" class="tauClass" value="" />
+            </div>
+            <div style="width: 30%; height: 100%; position: absolute; left: 65%; border: 2px dashed black; border-left: 0; z-index: 2;">
+                <p class="alphaP">Geo-textual Weight:</p>
+                <p style="position: absolute; left: 240px; top: -20%; color: #808080;">0</p>
+                <p style="position: absolute; left: 345px; top: -20%; color: #808080;">1</p>
+                <input type="range" id="alphaInput" class="alphaClass" min="0" max="1.0" step="0.1" value="0.5" oninput="alphaInputChange()"/>
+            </div>
+        </div>
+        <div id="canvas" class="canvaBox">
+            <div id="directionsItinerary"></div>
+            <div id="myMap" class="myBingMap"></div>
+        </div>
+    </div>
+
+    <div id="resDiv" class="resBox">
+        <div style="position: absolute; width: 100%; height: 12.5%; top:-0.3%;">
+            <strong style="font-size: 30px; position: absolute; top:-7%; left:0%;">Query Location:</strong>
+            <div style="position: absolute; width: 100%; height: 78%; top:25%; border: 2px dashed black;">
+                <p style="position: absolute; left: 15%; top: -10%; font-size: 25px;">Latitude:</p>
+                <p style="position: absolute; left: 10.5%; top: 30%; font-size: 25px;">Longitude:</p>
+                <input type="text" id="latInput" class="latClass" value="" />
+                <input type="text" id="lngInput" class="lngClass" value="" />
+                <img src="./source/pin_center_div.svg" class="centerIconClass" onclick="setCenterByInput()"/>
+            </div>
+        </div>
+        <div style="position: absolute; width: 100%; height: 8%; top:12.5%; background-color: 0;">
+            <div style="position: absolute; width: 80%; height: 100%;">
+                <strong style="font-size: 30px; position: absolute; top:10%; left:0%">Query Keywords:</strong>
+            </div>
+            <div style="width: 100%; height: 70%; position: absolute; top:60%; border: 2px dashed black; background-color:0;">
+                <!-- <p style="width:10%; position: absolute; left: 15%; top: -20%; font-size: 25px;">Keywords:</p> -->
+                <input type="text" id="source" value="" class="sourceBox" placeholder="Enter location"/>
+            </div>
+        </div>
+        <div style="position: absolute; width: 100%; height: 6%; top:23.5%; background-color: 0;">
+            <strong style="font-size: 30px; position: absolute; top:10%; left:0%">Query Time:</strong>
+            <div style="height: 100%; width:60%; position: absolute; left:35%;">
+                <p id="qtime" style="font-size: 30px; position: absolute; top:-33%; left:3%;">0.0</p>
+                <strong style="font-size: 30px; position: relative; top:10%; left:25%;">ms</strong>
+            </div>
+        </div>
+        <div style="position: absolute; width: 100%; height: 8%; top:29%; font-size: 25px; background-color: 0;">
+            <div id="queryResultsDiv" class="queryResultsClass" data-infoid="resInfos" onclick="clickLabel(this)">
+                <p style="position: absolute; top:-10px; left:25px">Query</p><br>
+                <p style="position: absolute; top:17px; left:22px">Results</p>
+            </div>
+            <div id="favoritesDiv" class="favoritesClass" data-infoid="favInfos" onclick="clickLabel(this)">
+                <p style="position: absolute; top:5px; left:18px">Favorites</p>
+            </div>
+            <div id="historyDiv" class="historyClass" data-infoid="hisInfos" onclick="clickLabel(this)">
+                <p style="position: absolute; top:5px; left:22px">History</p>
+            </div>
+            <div id="pathDiv" class="pathClass" data-infoid="pathInfos" onclick="clickLabel(this)">
+                <p style="position: absolute; top:5px; left:33px">Path</p>
+            </div>
+        </div>
+        
+        <div style="position: absolute; width: 100%; height: 62.5%; top: 37.1%; font-size: 18px; border: 1px solid rgb(138, 141, 141); border-top: 0; background-color: 0;">
+            <div id="resInfos" class="resInfosClass">
+            </div>
+            <div id="favInfos" class="favInfoClass">
+            </div>
+            <div id="hisInfos" class="hisInfoClass">
+            </div>
+            <div id="pathInfos" class="pathInfoClass">
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        (async () => {
+            let script = document.createElement("script");
+            script.setAttribute("src", `https://www.bing.com/api/maps/mapcontrol?callback=GetMap&key=AtjwqewjUE6IU1uooCcA7eYsGLL-tg7N30p8ENRN4qqB1hzCjWe00jWKfJuvKli5`);
+            document.body.appendChild(script);
+        })();
+    </script>
+</body>
+</html>
