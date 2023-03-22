@@ -1,0 +1,411 @@
+.leftPartClass{
+    position: absolute;
+    height: 99%;
+    width: 75%;
+    /* background-color: red; */
+}
+
+.paraBox{
+    position: absolute;
+    /* width:1150px;
+    height:30px; */
+    width:100%;
+    /* height:30px; */
+    height: 5%;
+    top:1%;
+    /* background-color: orange; */
+    font-size: 25px;
+    z-index: 1;
+}
+
+.tesNumP{
+    position: absolute;
+    left: 130px;
+    /* top:-5px; */
+    top: -20%;
+}
+
+.resNumClass{
+    position: absolute;
+    left: 277px;
+    /* top:6px; */
+    top: 20%;
+    width: 30px;
+    height: 30px;
+    text-align:center;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+
+.tauP{
+    position: absolute;
+    left: 70px;
+    top: -20%;
+}
+
+.tauClass{
+    position: absolute;
+    left: 245px;
+    top: 20%;
+    width: 30px;
+    height: 30px;
+    text-align:center;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+
+.alphaP{
+    position: absolute;
+    left: 30px;
+    top: -20%;
+    /* border: none; */
+}
+
+.alphaClass{
+    position: absolute;
+    left: 255px;
+    top: 30%;
+    width: 100px;
+    height: 18px;
+    text-align:center;
+}
+
+input[type="text"]
+{
+    font-size:20px;
+}
+
+/* input[type='range']::-webkit-slider-runnable-track{
+    background-color: gray;
+    width: auto;
+    height: 3px;
+}
+
+input[type="range"]::-ms-track{
+    color:transparent;
+    background-color: #eee;
+} */
+
+input[type="range"] {
+    /*-webkit-box-shadow: 0 1px 0 0px #424242, 0 1px 0 #060607 inset, 0px 2px 10px 0px black inset, 1px 0px 2px rgba(0, 0, 0, 0.4) inset, 0 0px 1px rgba(0, 0, 0, 0.6) inset;*/
+    -webkit-appearance: none; /* 去除默认样式 */
+    margin-top: 8px;
+    background-color: gray;
+    /*border-radius: 15px;*/
+    width: 80px !important;
+    -webkit-appearance: none;
+    height:4px;
+    padding: 0;
+    border: none;
+
+/*input的长度为80%，margin-left的长度为10%*/
+}
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;/* 去除默认样式 */
+    cursor: default;
+    top: 0;
+    height: 15px;
+    width: 15px;
+    /* transform: translateY(0px); */
+    /*background: none repeat scroll 0 0 #5891f5;*/
+    background: #139ff6;
+    border-radius: 15px;
+    border: 3px solid #139ff6;
+    /*-webkit-box-shadow: 0 -1px 1px #fc7701 inset;*/
+}
+
+.placeBox{
+    position: absolute;
+    /* width:1150px;
+    height:60px; */
+    width: 100%;;
+    /* height:60px; */
+    height: 5%;
+    top: 8%;
+    /* background-color: aqua; */
+    font-size: 25px;
+}
+
+.canvaBox{
+    position: absolute;
+    width:93%;
+    height:88%;
+    top:10%;
+    left: 2%;
+}
+
+.resBox{
+    position: absolute;
+    height: 96%;
+    width: 24.5%;
+    top:2%;
+    left: 74%;
+    background-color: white;
+    /* border: 1px solid rgb(138, 141, 141); */
+    border-top: 0;
+}
+
+.latClass{
+    position: absolute;
+    left: 40%;
+    top: 8%;
+    height: 32px;
+    width: 166px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+
+.lngClass{
+    position: absolute;
+    left: 40%;
+    top: 50%;
+    height: 32px;
+    width: 166px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+
+.centerIconClass{
+    position: absolute;
+    left: 83%;
+    top: 28%;
+    height: 45px;
+    width: 45px;
+}
+
+.queryResultsClass{
+    position: absolute;
+    /* width: 94px;
+    border: 3px solid rgb(230, 72, 72); */
+    /* top:-50.5px;
+    left: -0.5px;
+    height: 50px;
+    width: 99.5px; */
+    top:0px;
+    left: 0px;
+    height: 100%;
+    width: 25%;
+
+    border: 1px solid rgb(138, 141, 141);
+    /* 1px solid rgb(138, 141, 141); */
+    border-bottom: 0;
+    background-color: #fff;
+    /* text-align: center; */
+}
+
+.favoritesClass{
+    position: absolute;
+    /* width: 94px;
+    border: 3px solid #efb336; */
+    /* top:-50.5px;
+    left: 100px;
+    height: 50px;
+    width: 100px; */
+    top:0px;
+    left: 25%;
+    height: 100%;
+    width: 25%;
+    border-top: 1px solid rgb(138, 141, 141);
+    border-bottom: 1px solid rgb(138, 141, 141);
+    border-left: 1px solid rgb(138, 141, 141);
+    /* border-bottom: 0; */
+    background-color: #cfcfcf;
+    /* text-align: center; */
+}
+
+.historyClass{
+    position: absolute;
+    /* width: 94px;
+    border: 3px solid green; */
+    /* top:-50.5px;
+    left: 199.5px;
+    height: 50px;
+    width: 100px; */
+    top:0px;
+    left: 50%;
+    height: 100%;
+    width: 25%;
+    border: 1px solid rgb(138, 141, 141);
+    border-bottom: 1px solid rgb(138, 141, 141);
+    background-color: #cfcfcf;
+    /* text-align: center; */
+}
+
+.pathClass{
+    position: absolute;
+    /* width: 94px;
+    border: 3px solid green; */
+    /* top:-50.5px;
+    left: 199.5px;
+    height: 50px;
+    width: 100px; */
+    top:0px;
+    left: 75%;
+    height: 100%;
+    width: 25%;
+    border: 1px solid rgb(138, 141, 141);
+    border-bottom: 1px solid rgb(138, 141, 141);
+    background-color: #cfcfcf;
+    /* text-align: center; */
+}
+
+.resTitleClass{
+    position: absolute;
+    width: 100%;
+    height: 70px;
+    text-align: center;
+    /* top:20px; */
+    /* left: 70px; */
+    /* border: 1px solid black; */
+}
+
+.resInfosClass{
+    position: absolute;
+    /* width: 98%;
+    height: 99%; */
+    width: 100%;
+    height: 100%;
+    /* top:2px; */
+    overflow-x: auto;
+    visibility: visible;
+    /* border: 3px solid red; */
+    /* background-color: white; */
+}
+
+.favInfoClass{
+    position: absolute;
+    /* width: 98%;
+    height: 99%; */
+    width: 100%;
+    height: 100%;
+    /* top:2px; */
+    overflow-x: auto;
+    visibility: hidden;
+    /* border: 3px solid yellow; */
+    /* background-color: white; */
+}
+
+.hisInfoClass{
+    position: absolute;
+    /* width: 98%;
+    height: 99%; */
+    width: 100%;
+    height: 100%;
+    /* top:2px; */
+    overflow-x: auto;
+    visibility: hidden;
+    /* border: 3px solid green; */
+    /* background-color: white; */
+}
+
+.pathInfoClass{
+    position: absolute;
+    /* width: 98%;
+    height: 99%; */
+    width: 100%;
+    height: 100%;
+    /* top:2px; */
+    overflow-x: auto;
+    visibility: hidden;
+    /* border: 3px solid green; */
+    /* background-color: white; */
+}
+
+
+/* 设置滚动条的样式 */
+/* .resBox::-webkit-scrollbar {
+    width:12px;
+} */
+
+/*.resBox::-webkit-scrollbar-track {
+    background:rgba(255, 255, 255, 1);
+}
+
+.resBox::-webkit-scrollbar-thumb {
+    border-radius:10px;
+    background:rgba(0, 0, 0, 0.2);
+}
+ .resBox::-webkit-scrollbar-button {
+    display: flex;
+}
+.resBox::-webkit-scrollbar-track {
+    background: tomato;
+}  */
+
+.sourceBox {
+    position: absolute;
+    /* top: 20px; */
+    /* left: 20px; */
+    top: 10%;
+    left: 10%;
+    outline-style: none;
+    background-color: white;
+    z-index: 999;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    height: 40px;
+    width: 80%;
+}
+
+.destBox {
+    position: absolute;
+    /* top: 20px; */
+    /* left: 20px; */
+    top: 7%;
+    left: 160px;
+    background-color: white;
+    z-index: 999;
+    visibility: visible;
+    /* visibility:hidden; */
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    height: 40px;
+    width: 240px;
+}
+
+.myBingMap {
+    position:relative;
+    width: 100%;
+    min-width: 100%;
+    height: 100%;
+    /* padding-top: 50%; */
+    background-color:gray;
+    vertical-align: top;
+}
+
+/* .navIcon {
+    position: absolute;
+    top: 61px;
+    left: 290px;
+    width: 20px;
+    height: 20px;
+    z-index: 999;
+} */
+
+.routeIcon {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    top: 16%;
+    left: 85%;
+    z-index: 999;
+    visibility: visible;
+    /* visibility: hidden; */
+}
+
+/* .searchResultBox {
+    width:'153px';
+    height:'25px';
+    position:'absolute';
+    left:'21px';
+    top:'100px';
+    background-color:'white';
+    z-Index:'999';
+} */
+
+input:focus{
+    border-color: #66afe9;
+    outline: 0;
+    -webkit-box-shadow: inset 0 1px 1px rgba(0,0,0,.075),0 0 8px rgba(102,175,233,.6);
+    box-shadow: inset 0 1px 1px rgba(0,0,0,.075),0 0 8px rgba(159, 233, 102, 0.6)
+}
